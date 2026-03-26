@@ -6,25 +6,17 @@ interface UploadStepProps {
   loading: boolean;
   loadingProgress: number;
   history: HistoryEntry[];
-  onFile: (file: File) => void;
+  onFile: (files: File[]) => void;
 }
 
 export default function UploadStep({ loading, loadingProgress, history, onFile }: UploadStepProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isDraggingRef = useRef(false);
-
-  const handleFile = (file: File) => {
-    if (!file.name.toLowerCase().endsWith(".pdf")) {
-      alert("Пожалуйста, загрузите PDF файл.");
-      return;
-    }
-    onFile(file);
-  };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file) handleFile(file);
+    e.currentTarget.classList.remove("bg-blue-50", "border-blue-400");
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) onFile(files);
   };
 
   return (
@@ -35,13 +27,13 @@ export default function UploadStep({ loading, loadingProgress, history, onFile }
             Извлечение изображений из PDF
           </h1>
           <p className="text-muted-foreground text-sm leading-relaxed">
-            Загрузите PDF — каждая страница станет изображением.<br />
+            Загрузите один или несколько PDF — каждая страница станет изображением.<br />
             Выберите нужные и сохраните в новый PDF.
           </p>
         </div>
 
         <div
-          className={`border-2 border-dashed rounded-xl p-16 text-center cursor-pointer transition-all duration-200 border-border hover:border-foreground/30 hover:bg-secondary/40`}
+          className="border-2 border-dashed rounded-xl p-16 text-center cursor-pointer transition-all duration-200 border-border hover:border-foreground/30 hover:bg-secondary/40"
           onDrop={handleDrop}
           onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("bg-blue-50", "border-blue-400"); }}
           onDragLeave={(e) => { e.currentTarget.classList.remove("bg-blue-50", "border-blue-400"); }}
@@ -68,7 +60,7 @@ export default function UploadStep({ loading, loadingProgress, history, onFile }
               <p className="text-sm font-medium text-foreground mb-1.5">
                 Перетащите PDF сюда или нажмите для выбора
               </p>
-              <p className="text-xs text-muted-foreground">Поддерживаются любые PDF файлы</p>
+              <p className="text-xs text-muted-foreground">Можно загрузить несколько файлов сразу</p>
             </>
           )}
         </div>
@@ -77,8 +69,14 @@ export default function UploadStep({ loading, loadingProgress, history, onFile }
           ref={fileInputRef}
           type="file"
           accept=".pdf"
+          multiple
           className="hidden"
-          onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+          onChange={(e) => {
+            if (e.target.files && e.target.files.length > 0) {
+              onFile(Array.from(e.target.files));
+              e.target.value = "";
+            }
+          }}
         />
 
         {history.length > 0 && (

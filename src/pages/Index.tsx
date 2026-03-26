@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import * as pdfjs from "pdfjs-dist";
 import { jsPDF } from "jspdf";
 import Icon from "@/components/ui/icon";
@@ -29,50 +29,64 @@ export default function Index() {
     }
   });
   const [activeTab, setActiveTab] = useState<"images" | "settings" | "history">("images");
+  const addFileInputRef = useRef<HTMLInputElement>(null);
 
-  const extractImages = useCallback(async (file: File) => {
+  const extractImages = useCallback(async (files: File[]) => {
+    const pdfs = files.filter((f) => f.name.toLowerCase().endsWith(".pdf"));
+    if (pdfs.length === 0) {
+      alert("Пожалуйста, загрузите PDF файлы.");
+      return;
+    }
     setLoading(true);
     setLoadingProgress(0);
-    setFilename(file.name);
 
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-      const extracted: ExtractedImage[] = [];
+      const allExtracted: ExtractedImage[] = [];
 
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        setLoadingProgress(Math.round((pageNum / pdf.numPages) * 100));
-        const page = await pdf.getPage(pageNum);
-        const viewport = page.getViewport({ scale: 2.0 });
-        const canvas = document.createElement("canvas");
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        const ctx = canvas.getContext("2d")!;
-        await page.render({ canvasContext: ctx, viewport }).promise;
-        const dataUrl = canvas.toDataURL("image/jpeg", quality);
-        extracted.push({
-          id: `page-${pageNum}-${Date.now()}`,
-          dataUrl,
-          width: viewport.width,
-          height: viewport.height,
-          selected: true,
-          label: `Стр. ${pageNum}`,
+      for (let fi = 0; fi < pdfs.length; fi++) {
+        const file = pdfs[fi];
+        const shortName = file.name.replace(/\.pdf$/i, "").slice(0, 20);
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+          const globalProgress = Math.round(
+            ((fi * 100 + (pageNum / pdf.numPages) * 100) / pdfs.length)
+          );
+          setLoadingProgress(globalProgress);
+          const page = await pdf.getPage(pageNum);
+          const viewport = page.getViewport({ scale: 2.0 });
+          const canvas = document.createElement("canvas");
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          const ctx = canvas.getContext("2d")!;
+          await page.render({ canvasContext: ctx, viewport }).promise;
+          const dataUrl = canvas.toDataURL("image/jpeg", quality);
+          allExtracted.push({
+            id: `page-${fi}-${pageNum}-${Date.now()}`,
+            dataUrl,
+            width: viewport.width,
+            height: viewport.height,
+            selected: true,
+            label: pdfs.length > 1 ? `${shortName} · ${pageNum}` : `Стр. ${pageNum}`,
+          });
+        }
+
+        const entry: HistoryEntry = {
+          id: Date.now().toString(),
+          filename: file.name,
+          date: new Date().toLocaleDateString("ru-RU"),
+          imageCount: pdf.numPages,
+        };
+        setHistory((prev) => {
+          const updated = [entry, ...prev].slice(0, 10);
+          localStorage.setItem("pdf_history", JSON.stringify(updated));
+          return updated;
         });
       }
 
-      setImages(extracted);
-
-      const entry: HistoryEntry = {
-        id: Date.now().toString(),
-        filename: file.name,
-        date: new Date().toLocaleDateString("ru-RU"),
-        imageCount: extracted.length,
-      };
-      setHistory((prev) => {
-        const updated = [entry, ...prev].slice(0, 10);
-        localStorage.setItem("pdf_history", JSON.stringify(updated));
-        return updated;
-      });
+      setImages((prev) => [...prev, ...allExtracted]);
+      setFilename(pdfs.map((f) => f.name).join(", "));
       setStep("work");
     } catch {
       alert("Не удалось обработать PDF. Проверьте файл и попробуйте снова.");
@@ -163,6 +177,7 @@ export default function Index() {
     setImages([]);
     setFilename("");
     setActiveTab("images");
+    setLoadingProgress(0);
   };
 
   return (
@@ -177,15 +192,36 @@ export default function Index() {
             <span className="font-semibold text-sm tracking-tight">PDF Image Extractor</span>
           </div>
           {step === "work" && (
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <span className="text-xs text-muted-foreground font-mono truncate max-w-xs">{filename}</span>
+              <button
+                onClick={() => addFileInputRef.current?.click()}
+                disabled={loading}
+                className="text-xs border border-border text-foreground hover:bg-secondary transition-colors flex items-center gap-1.5 px-3 py-1.5 rounded-md"
+              >
+                <Icon name="Plus" size={12} />
+                Добавить PDF
+              </button>
               <button
                 onClick={reset}
                 className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
               >
                 <Icon name="RotateCcw" size={12} />
-                Новый файл
+                Сначала
               </button>
+              <input
+                ref={addFileInputRef}
+                type="file"
+                accept=".pdf"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    extractImages(Array.from(e.target.files));
+                    e.target.value = "";
+                  }
+                }}
+              />
             </div>
           )}
         </div>
@@ -196,7 +232,7 @@ export default function Index() {
           loading={loading}
           loadingProgress={loadingProgress}
           history={history}
-          onFile={extractImages}
+          onFile={(files) => extractImages(files)}
         />
       )}
 
