@@ -86,6 +86,18 @@ export default function Index() {
     setImages((prev) => prev.map((img) => img.id === id ? { ...img, selected: !img.selected } : img));
   };
 
+  const reorderImages = (fromId: string, toId: string) => {
+    setImages((prev) => {
+      const arr = [...prev];
+      const fromIdx = arr.findIndex((i) => i.id === fromId);
+      const toIdx = arr.findIndex((i) => i.id === toId);
+      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return prev;
+      const [moved] = arr.splice(fromIdx, 1);
+      arr.splice(toIdx, 0, moved);
+      return arr;
+    });
+  };
+
   const selectedImages = images.filter((img) => img.selected);
 
   const exportToPDF = async () => {
@@ -194,6 +206,7 @@ export default function Index() {
           onTabChange={setActiveTab}
           images={images}
           onToggleImage={toggleImageSelection}
+          onReorder={reorderImages}
           onSelectAll={() => setImages((p) => p.map((i) => ({ ...i, selected: true })))}
           onDeselectAll={() => setImages((p) => p.map((i) => ({ ...i, selected: false })))}
           selectedImages={selectedImages}

@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import Icon from "@/components/ui/icon";
 import {
   ExtractedImage,
@@ -13,6 +14,7 @@ interface SidebarProps {
   onTabChange: (tab: "images" | "settings" | "history") => void;
   images: ExtractedImage[];
   onToggleImage: (id: string) => void;
+  onReorder: (fromId: string, toId: string) => void;
   onSelectAll: () => void;
   onDeselectAll: () => void;
   selectedCount: number;
@@ -34,6 +36,7 @@ export default function Sidebar({
   onTabChange,
   images,
   onToggleImage,
+  onReorder,
   onSelectAll,
   onDeselectAll,
   selectedCount,
@@ -49,6 +52,27 @@ export default function Sidebar({
   onMarginChange,
   history,
 }: SidebarProps) {
+  const dragId = useRef<string | null>(null);
+  const dragOverId = useRef<string | null>(null);
+
+  const handleDragStart = (id: string) => {
+    dragId.current = id;
+  };
+
+  const handleDragOver = (e: React.DragEvent, id: string) => {
+    e.preventDefault();
+    dragOverId.current = id;
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (dragId.current && dragOverId.current && dragId.current !== dragOverId.current) {
+      onReorder(dragId.current, dragOverId.current);
+    }
+    dragId.current = null;
+    dragOverId.current = null;
+  };
+
   return (
     <aside className="w-72 border-r border-border bg-card flex flex-col flex-shrink-0">
       <div className="flex border-b border-border">
@@ -70,7 +94,11 @@ export default function Sidebar({
       {/* Images Tab */}
       {activeTab === "images" && (
         <div className="flex-1 overflow-y-auto p-3">
-          <div className="flex items-center justify-between mb-3 px-1">
+          <p className="text-[10px] text-muted-foreground/60 px-1 mb-2 flex items-center gap-1">
+            <Icon name="GripHorizontal" size={10} />
+            Перетащите для изменения порядка
+          </p>
+          <div className="flex items-center justify-between mb-2 px-1">
             <span className="text-xs text-muted-foreground">
               {selectedCount} из {images.length}
             </span>
@@ -94,25 +122,37 @@ export default function Sidebar({
             {images.map((img, idx) => (
               <div
                 key={img.id}
-                className={`relative rounded-md overflow-hidden cursor-pointer border-2 transition-all duration-150 ${
+                draggable
+                onDragStart={() => handleDragStart(img.id)}
+                onDragOver={(e) => handleDragOver(e, img.id)}
+                onDrop={handleDrop}
+                className={`relative rounded-md overflow-hidden border-2 transition-all duration-150 select-none ${
                   img.selected ? "border-foreground" : "border-transparent opacity-40"
                 }`}
-                onClick={() => onToggleImage(img.id)}
-                style={{ animationDelay: `${idx * 40}ms` }}
+                style={{ animationDelay: `${idx * 40}ms`, cursor: "grab" }}
               >
                 <img
                   src={img.dataUrl}
                   alt={img.label}
-                  className="w-full aspect-[3/4] object-cover"
+                  className="w-full aspect-[3/4] object-cover pointer-events-none"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent flex items-end p-1.5">
                   <span className="text-white text-[10px] font-mono">{img.label}</span>
                 </div>
+                {/* Кнопка выбора отдельно от drag-зоны */}
+                <button
+                  onClick={() => onToggleImage(img.id)}
+                  className="absolute inset-0 w-full h-full"
+                  style={{ cursor: "inherit" }}
+                />
                 {img.selected && (
-                  <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-foreground rounded-sm flex items-center justify-center">
+                  <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-foreground rounded-sm flex items-center justify-center pointer-events-none">
                     <Icon name="Check" size={10} className="text-background" />
                   </div>
                 )}
+                <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 pointer-events-none">
+                  <Icon name="GripHorizontal" size={12} className="text-white/60" />
+                </div>
               </div>
             ))}
           </div>

@@ -8,6 +8,7 @@ interface WorkStepProps {
   onTabChange: (tab: "images" | "settings" | "history") => void;
   images: ExtractedImage[];
   onToggleImage: (id: string) => void;
+  onReorder: (fromId: string, toId: string) => void;
   onSelectAll: () => void;
   onDeselectAll: () => void;
   selectedImages: ExtractedImage[];
@@ -31,6 +32,7 @@ export default function WorkStep({
   onTabChange,
   images,
   onToggleImage,
+  onReorder,
   onSelectAll,
   onDeselectAll,
   selectedImages,
@@ -59,6 +61,7 @@ export default function WorkStep({
         onTabChange={onTabChange}
         images={images}
         onToggleImage={onToggleImage}
+        onReorder={onReorder}
         onSelectAll={onSelectAll}
         onDeselectAll={onDeselectAll}
         selectedCount={selectedImages.length}
